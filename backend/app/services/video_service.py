@@ -43,7 +43,7 @@ class VideoService:
 
             # 执行ffmpeg命令
             cmd = [
-                'C:\\ffmpeg-8.0.1-essentials_build\\bin\\ffmpeg',
+                'ffmpeg',
                 '-y',  # 覆盖输出文件
                 '-f', 'concat',
                 '-safe', '0',
