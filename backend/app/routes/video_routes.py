@@ -228,12 +228,21 @@ def get_video_status(workflow_id, idx):
                     # 下载视频
                     response = requests.get(video_url, timeout=300)
                     if response.status_code == 200:
+                        video_data = response.content
+                        
                         # 上传到OSS
                         oss_path = oss.get_video_segment_path(workflow_id, idx)
-                        oss.upload_file(oss_path, response.content, 'video/mp4')
+                        oss.upload_file(oss_path, video_data, 'video/mp4')
                         workflow['segments'][idx]['video_url'] = f"/api/video/{workflow_id}/{idx}"
                         workflow['segments'][idx]['video_oss_path'] = oss_path
                         print(f"视频转存OSS成功: {oss_path}")
+                        
+                        # 同时保存到本地（与OSS目录层级一致）
+                        local_path = os.path.join(Config.LOCAL_DATA_DIR, oss_path)
+                        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                        with open(local_path, 'wb') as f:
+                            f.write(video_data)
+                        print(f"视频保存本地成功: {local_path}")
                     else:
                         # 下载失败
                         workflow['segments'][idx]['video_status'] = 'failed'
@@ -329,11 +338,21 @@ def merge_videos(workflow_id):
         if not success:
             return jsonify({"error": "视频合成失败"}), 500
 
-        # 上传到OSS或保存到本地
+        # 上传到OSS并保存到本地
         oss = get_oss_service()
         if oss:
             with open(output_path, 'rb') as f:
-                oss.upload_final_video(workflow_id, f.read())
+                video_data = f.read()
+            oss_path = oss.get_final_video_path(workflow_id)
+            oss.upload_file(oss_path, video_data, 'video/mp4')
+            
+            # 同时保存到本地（与OSS目录层级一致）
+            local_path = os.path.join(Config.LOCAL_DATA_DIR, oss_path)
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            with open(local_path, 'wb') as f:
+                f.write(video_data)
+            print(f"合成视频保存成功: OSS={oss_path}, 本地={local_path}")
+            
             # 使用代理URL而不是OSS直链
             final_url = f"/api/final-video/{workflow_id}"
         else:
@@ -454,20 +473,36 @@ def get_image(workflow_id, idx):
 
 @video_bp.route('/api/video/<workflow_id>/<int:idx>', methods=['GET'])
 def get_video(workflow_id, idx):
-    """获取视频片段（代理接口，支持本地和OSS）"""
+    """获取视频片段（代理接口，本地优先，OSS备份）"""
     from io import BytesIO
     
-    # 先检查本地
-    local_path = os.path.join(Config.LOCAL_DATA_DIR, 'segments', workflow_id, f'segment_{idx}.mp4')
-    if os.path.exists(local_path):
+    oss = get_oss_service()
+    oss_path = oss.get_video_segment_path(workflow_id, idx) if oss else None
+    local_path = os.path.join(Config.LOCAL_DATA_DIR, oss_path) if oss_path else None
+    
+    # 检查本地文件
+    local_exists = local_path and os.path.exists(local_path)
+    local_mtime = os.path.getmtime(local_path) if local_exists else 0
+    
+    # 获取OSS文件元信息
+    oss_mtime = 0
+    if oss and oss_path:
+        meta = oss.get_object_meta(oss_path)
+        if meta:
+            oss_mtime = meta['last_modified']
+    
+    # 本地存在且时间晚于OSS，使用本地
+    if local_exists and local_mtime >= oss_mtime:
         return send_file(local_path, mimetype='video/mp4')
     
     # 从OSS获取
-    oss = get_oss_service()
-    if oss:
+    if oss and oss_mtime > 0:
         try:
-            oss_path = oss.get_video_segment_path(workflow_id, idx)
             video_data = oss.download_file(oss_path)
+            # 同步保存到本地
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            with open(local_path, 'wb') as f:
+                f.write(video_data)
             return send_file(BytesIO(video_data), mimetype='video/mp4')
         except Exception as e:
             print(f"获取视频失败: {e}")
@@ -477,22 +512,40 @@ def get_video(workflow_id, idx):
 
 @video_bp.route('/api/final-video/<workflow_id>', methods=['GET'])
 def get_final_video(workflow_id):
-    """获取合成后的完整视频（代理接口，支持本地和OSS）"""
+    """获取合成后的完整视频（代理接口，本地优先，OSS备份）"""
     from io import BytesIO
     
-    # 先检查本地
-    local_path = os.path.join(Config.LOCAL_DATA_DIR, 'finals', f'{workflow_id}.mp4')
-    if os.path.exists(local_path):
+    oss = get_oss_service()
+    oss_path = oss.get_final_video_path(workflow_id) if oss else None
+    local_path = os.path.join(Config.LOCAL_DATA_DIR, oss_path) if oss_path else None
+    
+    # 检查本地文件
+    local_exists = local_path and os.path.exists(local_path)
+    local_mtime = os.path.getmtime(local_path) if local_exists else 0
+    
+    # 获取OSS文件元信息
+    oss_mtime = 0
+    if oss and oss_path:
+        meta = oss.get_object_meta(oss_path)
+        if meta:
+            oss_mtime = meta['last_modified']
+    
+    # 本地存在且时间晚于OSS，使用本地
+    if local_exists and local_mtime >= oss_mtime:
         return send_file(local_path, mimetype='video/mp4')
     
     # 从OSS获取
-    oss = get_oss_service()
-    if oss:
+    if oss and oss_mtime > 0:
         try:
-            oss_path = oss.get_final_video_path(workflow_id)
             video_data = oss.download_file(oss_path)
+            # 同步保存到本地
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            with open(local_path, 'wb') as f:
+                f.write(video_data)
             return send_file(BytesIO(video_data), mimetype='video/mp4')
         except Exception as e:
             print(f"获取完整视频失败: {e}")
+    
+    return jsonify({"error": "视频不存在"}), 404
     
     return jsonify({"error": "视频不存在"}), 404

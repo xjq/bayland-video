@@ -86,6 +86,17 @@ class OSSService:
         result = self.bucket.get_object(oss_path)
         return result.read()
 
+    def get_object_meta(self, oss_path: str) -> Optional[dict]:
+        """获取OSS对象元信息（包含最后修改时间）"""
+        try:
+            meta = self.bucket.get_object_meta(oss_path)
+            return {
+                'last_modified': meta.last_modified,  # Unix timestamp
+                'content_length': meta.content_length
+            }
+        except Exception:
+            return None
+
     def download_to_local(self, oss_path: str, local_path: str):
         """下载OSS文件到本地"""
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
