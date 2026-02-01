@@ -146,7 +146,7 @@ export default function Step2SegmentProcess() {
         return (
           <div key={idx} className="border border-gray-200 rounded-lg overflow-hidden">
             {/* 片段头部 */}
-            <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-b border-gray-200">
+            <div className="bg-blue-100 px-4 py-3 flex items-center justify-between border-b border-blue-300">
               <span className="font-medium text-gray-900">片段 #{idx + 1}</span>
               <span className={`px-2 py-1 text-xs rounded-full ${status.className}`}>
                 {status.text}

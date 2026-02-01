@@ -115,10 +115,20 @@ class BailianService:
             }
         }
 
+        print(f"\n{'='*60}")
+        print(f"[百炼] 提交视频生成任务")
+        print(f"[百炼] 模型: {Config.VIDEO_MODEL}")
+        print(f"[百炼] 图片URL: {image_url}")
+        print(f"[百炼] 提示词: {prompt[:100]}..." if len(prompt) > 100 else f"[百炼] 提示词: {prompt}")
+        print(f"[百炼] 参数: duration={Config.VIDEO_DURATION}, size={Config.VIDEO_RESOLUTION}, prompt_extend={Config.VIDEO_PROMPT_EXTEND}")
+        print(f"[百炼] 请求URL: {url}")
+
         response = requests.post(url, headers=headers, json=payload)
         result = response.json()
         
-        print(f"[DEBUG] 百炼API响应: {result}")  # 打印完整响应
+        print(f"[百炼] HTTP状态码: {response.status_code}")
+        print(f"[百炼] 响应内容: {json.dumps(result, ensure_ascii=False, indent=2)}")
+        print(f"{'='*60}\n")
         
         if "output" in result and "task_id" in result["output"]:
             return {
@@ -128,7 +138,7 @@ class BailianService:
         else:
             return {
                 "success": False,
-                "error": result.get("message", "提交视频生成任务失败")
+                "error": result.get("message", str(result))
             }
 
     def query_video_task(self, task_id: str) -> dict:
@@ -143,14 +153,25 @@ class BailianService:
         response = requests.get(url, headers=headers)
         result = response.json()
         
+        print(f"\n[百炼] 查询任务状态: {task_id}")
+        print(f"[百炼] HTTP状态码: {response.status_code}")
+        print(f"[百炼] 响应内容: {json.dumps(result, ensure_ascii=False, indent=2)}")
+        
         if "output" not in result:
+            print(f"[百炼] 错误: 响应中没有output字段")
             return {
                 "status": "failed",
-                "error": result.get("message", "查询任务状态失败")
+                "error": result.get("message", str(result))
             }
 
         output = result["output"]
         task_status = output.get("task_status", "UNKNOWN")
+        
+        print(f"[百炼] 任务状态: {task_status}")
+        if output.get("video_url"):
+            print(f"[百炼] 视频URL: {output['video_url']}")
+        if output.get("message"):
+            print(f"[百炼] 消息: {output['message']}")
         
         status_map = {
             "PENDING": "pending",
