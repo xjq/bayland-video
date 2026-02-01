@@ -81,8 +81,10 @@ class BailianService:
 
     def optimize_to_prompt2(self, segment_text: str) -> str:
 
-        prefix = "Create a realistic, high-quality talking-head video of a friendly and knowledgeable health-conscious speaker (gender-neutral or female-presenting, natural appearance, soft lighting, neutral background). The speaker delivers the following script in a clear, conversational tone with appropriate facial expressions and lip-sync accuracy:"
-        sufix = "Ensure natural mouth movements, subtle head gestures, and authentic eye contact. The video should be 1080p, well-lit, with clean audio synchronization, and a calm, trustworthy atmosphere—ideal for wellness or natural health content."
+        #prefix = "Create a realistic, high-quality talking-head video of a friendly and knowledgeable health-conscious speaker (gender-neutral or female-presenting, natural appearance, soft lighting, neutral background). The speaker delivers the following script in a clear, conversational tone with appropriate facial expressions and lip-sync accuracy:"
+        prefix = "Create a realistic, high-quality talking-head video. The speaker delivers the following script in a clear, conversational tone with appropriate facial expressions and lip-sync accuracy"
+        #sufix = "Ensure natural mouth movements, subtle head gestures, and authentic eye contact. The video should be 1080p, well-lit, with clean audio synchronization, and a calm, trustworthy atmosphere—ideal for wellness or natural health content."
+        sufix = "Ensure natural mouth movements, subtle head gestures, and authentic eye contact. The video should be 1080p, well-lit, with clean audio synchronization, and a calm, trustworthy atmosphere"
         return prefix + segment_text + sufix
 
     def submit_video_task(self, prompt: str, image_url: str) -> dict:
