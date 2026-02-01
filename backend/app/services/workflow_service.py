@@ -39,22 +39,13 @@ class WorkflowService:
         return workflow
 
     def get_workflow(self, workflow_id: str) -> Optional[dict]:
-        """获取工作流详情（优先从本地获取，本地没有再从OSS获取）"""
-        # 先从本地获取
-        path = self._get_workflow_path(workflow_id)
-        if os.path.exists(path):
-            with open(path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        
-        # 本地没有，尝试从OSS获取
+        """获取工作流详情（从OSS获取）"""
         oss = get_oss_service()
         if oss:
             try:
                 oss_path = self._get_oss_workflow_path(workflow_id)
                 data = oss.download_file(oss_path)
                 workflow = json.loads(data.decode('utf-8'))
-                # 同步到本地缓存
-                self._save_local(workflow)
                 return workflow
             except Exception as e:
                 print(f"从OSS获取工作流失败: {e}")

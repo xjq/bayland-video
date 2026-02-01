@@ -110,7 +110,7 @@ class BailianService:
             },
             "parameters": {
                 "duration": Config.VIDEO_DURATION,
-                "size": Config.VIDEO_RESOLUTION,
+                "resolution": Config.VIDEO_RESOLUTION,
                 "prompt_extend": Config.VIDEO_PROMPT_EXTEND
             }
         }
