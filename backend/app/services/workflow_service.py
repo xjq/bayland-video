@@ -100,19 +100,20 @@ class WorkflowService:
         return deleted
 
     def list_workflows(self) -> List[dict]:
-        """列出所有工作流（优先从本地获取）"""
+        """列出所有工作流（从OSS获取）"""
         workflows = []
-        workflow_ids = set()
         
-        # 先从本地获取
-        if os.path.exists(self.workflow_dir):
-            for filename in os.listdir(self.workflow_dir):
-                if filename.endswith('.json'):
-                    path = os.path.join(self.workflow_dir, filename)
-                    try:
-                        with open(path, 'r', encoding='utf-8') as f:
-                            workflow = json.load(f)
-                            workflow_ids.add(workflow["id"])
+        oss = get_oss_service()
+        if oss:
+            try:
+                import oss2
+                # 遍历OSS中的工作流文件
+                prefix = Config.OSS_WORKFLOW_DIR
+                for obj in oss2.ObjectIterator(oss.bucket, prefix=prefix):
+                    if obj.key.endswith('.json'):
+                        try:
+                            data = oss.download_file(obj.key)
+                            workflow = json.loads(data.decode('utf-8'))
                             workflows.append({
                                 "id": workflow["id"],
                                 "name": workflow["name"],
@@ -120,8 +121,10 @@ class WorkflowService:
                                 "status": workflow.get("status", "draft"),
                                 "segment_count": len(workflow.get("segments", []))
                             })
-                    except Exception:
-                        pass
+                        except Exception as e:
+                            print(f"读取工作流失败 {obj.key}: {e}")
+            except Exception as e:
+                print(f"从OSS获取工作流列表失败: {e}")
 
         # 按创建时间降序排序
         workflows.sort(key=lambda x: x["created_at"], reverse=True)
